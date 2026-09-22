@@ -61,3 +61,17 @@ jobs:
             if (r.contentCls > 0.001) throw new Error(`CLS leaked to content: ${r.contentCls}`);
             console.log(`ok: ${slot.cls} CLS attributed to ${slot.id} via push`);
           '
+
+      # A generic wrapper injected around a named slot must not shadow it.
+      - name: Audit the wrapped-slot fixture
+        run: |
+          node dist/cli.js http://127.0.0.1:8899/wrapped-slot.html \
+            --no-throttle --wait 3000 --json > wrapped.json
+          node -e '
+            const r = require("./wrapped.json");
+            if (r.slots.length !== 1) throw new Error(`expected 1 slot, got ${r.slots.length}`);
+            const slot = r.slots[0];
+            if (slot.id !== "inner-slot") throw new Error(`wrapper shadowed the named slot: ${slot.id}`);
+            if (slot.network !== "Google AdSense") throw new Error(`wrong network: ${slot.network}`);
+            console.log(`ok: named slot ${slot.id} won over the generic wrapper`);
+          '

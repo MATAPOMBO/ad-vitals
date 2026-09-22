@@ -161,9 +161,17 @@ export function installCollector(config: CollectorConfig): void {
     if (slots.has(el)) return;
     const match = matchNetwork(el);
     if (!match) return;
-    // Skip a container that only wraps another already-registered slot.
-    for (const known of slots.keys()) {
-      if (el.contains(known) || known.contains(el)) return;
+
+    // Only one slot per nesting chain. A generic wrapper registered first must
+    // give way to the network-specific element inside it, otherwise a slot that
+    // ad-vitals could name precisely gets reported as "Unknown".
+    for (const [known, record] of slots) {
+      if (!known.contains(el) && !el.contains(known)) continue;
+      const replacesGeneric = record.network === 'Unknown' && match.network !== 'Unknown' && known.contains(el);
+      if (!replacesGeneric) return;
+      slots.delete(known);
+      resizeObserver?.unobserve(known);
+      break;
     }
     const rect = el.getBoundingClientRect();
     const scrollY = window.scrollY || 0;

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wrapped slot fixture</title>
+    <style>
+      body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+      main { max-width: 680px; margin: 0 auto; padding: 16px; }
+      ins.adsbygoogle { display: block; background: #eee; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fixture: generic wrapper injected around a named slot</h1>
+      <div id="mount"></div>
+      <div id="article">
+        <p>Paragraph one.</p>
+        <p>Paragraph two.</p>
+      </div>
+    </main>
+
+    <script>
+      // The wrapper matches only a generic signature; the <ins> inside it is a
+      // named AdSense slot. The named slot must win, not the wrapper.
+      setTimeout(function () {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'ad-container';
+        wrapper.innerHTML = '<ins class="adsbygoogle" id="inner-slot"></ins>';
+        document.getElementById('mount').appendChild(wrapper);
+
+        setTimeout(function () {
+          var slot = document.getElementById('inner-slot');
+          slot.style.height = '280px';
+          slot.textContent = 'creative';
+        }, 500);
+      }, 600);
+    </script>
+  </body>
+</html>
