@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+
+      # The fixture has a known-correct answer: an unreserved AdSense slot that
+      # grows to 250px and pushes the article down. All CLS must land on it.
+      - name: Audit the fixture
+        run: |
+          npx --yes http-server test/fixtures -p 8899 --silent &
+          npx wait-on http://127.0.0.1:8899/pushing-ad.html -t 30000
+          node dist/cli.js http://127.0.0.1:8899/pushing-ad.html \
+            --no-throttle --wait 2500 --json > result.json
+          cat result.json
+
+      - name: Assert the shift was attributed to the ad slot
+        run: |
+          node -e '
+            const r = require("./result.json");
+            const slot = r.slots.find(s => s.id === "slot-leaderboard");
+            if (!slot) throw new Error("slot-leaderboard was not detected");
+            if (slot.network !== "Google AdSense") throw new Error(`wrong network: ${slot.network}`);
+            if (slot.cls <= 0.05) throw new Error(`expected the slot to own the CLS, got ${slot.cls}`);
+            if (slot.pushShifts < 1) throw new Error("expected a push-attributed shift");
+            if (r.contentCls > 0.001) throw new Error(`CLS leaked to content: ${r.contentCls}`);
+            console.log(`ok: ${slot.cls} CLS attributed to ${slot.id} via push`);
+          '

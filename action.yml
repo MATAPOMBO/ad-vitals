@@ -1,0 +1,106 @@
+name: 'ad-vitals'
+description: 'Fail the build when an ad slot pushes Cumulative Layout Shift over budget.'
+author: 'Mateus de Carvalho'
+branding:
+  icon: 'bar-chart-2'
+  color: 'orange'
+
+inputs:
+  url:
+    description: 'URL to audit.'
+    required: true
+  budget:
+    description: 'Fail when ad-attributed CLS exceeds this value. Omit to report without failing.'
+    required: false
+  device:
+    description: 'mobile or desktop.'
+    required: false
+    default: 'mobile'
+  wait:
+    description: 'Milliseconds to wait after load for ads to settle.'
+    required: false
+    default: '5000'
+  throttle:
+    description: 'Emulate slow 4G with a 4x CPU slowdown.'
+    required: false
+    default: 'true'
+  version:
+    description: 'Version of ad-vitals to run.'
+    required: false
+    default: 'latest'
+
+outputs:
+  ad-cls:
+    description: 'CLS attributed to ad slots.'
+    value: ${{ steps.audit.outputs.ad-cls }}
+  total-cls:
+    description: 'Total page CLS.'
+    value: ${{ steps.audit.outputs.total-cls }}
+  report:
+    description: 'Path to the JSON report.'
+    value: ${{ steps.audit.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install browser
+      shell: bash
+      run: npx --yes playwright install --with-deps chromium
+
+    - name: Run ad-vitals
+      id: audit
+      shell: bash
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_BUDGET: ${{ inputs.budget }}
+        INPUT_DEVICE: ${{ inputs.device }}
+        INPUT_WAIT: ${{ inputs.wait }}
+        INPUT_THROTTLE: ${{ inputs.throttle }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        args=("$INPUT_URL" --device "$INPUT_DEVICE" --wait "$INPUT_WAIT")
+        if [ "$INPUT_THROTTLE" != "true" ]; then args+=(--no-throttle); fi
+
+        # One audit only: ad auctions are non-deterministic, so a second run
+        # would report different numbers than the ones that gate the build.
+        npx --yes "ad-vitals@${INPUT_VERSION}" "${args[@]}" --json > report.json
+
+        node -e '
+          const fs = require("fs");
+          const r = JSON.parse(fs.readFileSync("report.json", "utf8"));
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            `ad-cls=${r.adCls}\ntotal-cls=${r.totalCls}\nreport=report.json\n`);
+
+          const rows = r.slots.filter(s => s.cls > 0)
+            .map(s => `| \`${s.id}\` | ${s.network} | ${s.cls.toFixed(3)} | ${s.initialHeight}px → ${s.finalHeight}px |`)
+            .join("\n");
+
+          const summary = [
+            `### ad-vitals · ${r.finalUrl}`,
+            "",
+            `**CLS ${r.totalCls.toFixed(3)}** — ads ${r.adCls.toFixed(3)}, content ${r.contentCls.toFixed(3)}`,
+            `**Ad script blocking** ${Math.round(r.adTbt)}ms of ${Math.round(r.tbt)}ms total`,
+            "",
+            rows ? "| Slot | Network | CLS | Growth |\n| --- | --- | --- | --- |\n" + rows
+                 : "_No ad-attributed layout shift._",
+            "",
+            ...r.findings.map(f => `- ${f.severity === "critical" ? "❌" : f.severity === "warning" ? "⚠️" : "ℹ️"} **${f.title}** — ${f.detail}`),
+          ].join("\n");
+
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + "\n");
+          }
+          console.log(summary);
+
+          const budget = process.env.INPUT_BUDGET;
+          if (budget) {
+            if (r.adCls > Number(budget)) {
+              console.error(`\nad-vitals: ad-attributed CLS ${r.adCls} exceeds budget ${budget}`);
+              process.exit(1);
+            }
+            console.log(`\nad-vitals: ad-attributed CLS ${r.adCls} within budget ${budget}`);
+          }
+        '

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pushing ad fixture</title>
+    <style>
+      body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+      main { max-width: 680px; margin: 0 auto; padding: 16px; }
+      h1 { margin: 0 0 12px; font-size: 24px; }
+      p { margin: 0 0 16px; }
+      /* No reserved height: the injected creative will push everything below it. */
+      ins.adsbygoogle { display: block; background: #eee; }
+      #article { background: #fafafa; padding: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fixture: unreserved ad slot pushes article content</h1>
+
+      <ins class="adsbygoogle" id="slot-leaderboard" data-ad-slot="1234567890"></ins>
+
+      <div id="article">
+        <p>Paragraph one of the article body.</p>
+        <p>Paragraph two of the article body.</p>
+        <p>Paragraph three of the article body.</p>
+        <p>Paragraph four of the article body.</p>
+      </div>
+    </main>
+
+    <script>
+      // Simulate an ad creative arriving late and expanding the slot to 250px.
+      // Everything below #slot-leaderboard shifts down by exactly 250px.
+      setTimeout(function () {
+        var slot = document.getElementById('slot-leaderboard');
+        slot.style.height = '250px';
+        slot.textContent = 'creative';
+      }, 900);
+    </script>
+  </body>
+</html>
