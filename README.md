@@ -89,7 +89,7 @@ By default the audit runs as **mobile on slow 4G with a 4x CPU slowdown**, match
 npx ad-vitals https://yoursite.com --budget 0.05
 ```
 
-Exit codes: `0` pass, `1` over budget, `2` bad arguments, `3` browser missing.
+Exit codes: `0` pass, `1` over budget, `2` bad arguments, `3` browser missing, `4` page unreachable.
 
 ### GitHub Action
 

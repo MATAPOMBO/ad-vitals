@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { HELP, normalizeUrl, parseArgs, type ParsedArgs } from './args.js';
-import { audit, BrowserMissingError } from './audit.js';
+import { audit, BrowserMissingError, NavigationError } from './audit.js';
 import { renderReport } from './report.js';
 
 async function main(): Promise<number> {
@@ -54,6 +54,10 @@ async function main(): Promise<number> {
     }
     return 0;
   } catch (error) {
+    if (error instanceof NavigationError) {
+      console.error(error.message);
+      return 4;
+    }
     if (error instanceof BrowserMissingError) {
       console.error(
         'Could not launch Chromium.\n\n' +

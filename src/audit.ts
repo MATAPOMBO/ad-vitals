@@ -43,6 +43,45 @@ export class BrowserMissingError extends Error {
   }
 }
 
+/** A page that could not be reached, described in terms the user can act on. */
+export class NavigationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NavigationError';
+  }
+}
+
+function describeNavigationFailure(error: unknown, url: string): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const host = (() => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  })();
+
+  if (raw.includes('ERR_NAME_NOT_RESOLVED')) {
+    return `No such domain: ${host}\n\nCheck the spelling. A URL without a scheme is fine — ad-vitals adds https:// for you.`;
+  }
+  if (raw.includes('ERR_CONNECTION_REFUSED')) {
+    return `${host} refused the connection.\n\nIs the server running, and is the port right?`;
+  }
+  if (raw.includes('ERR_CONNECTION_TIMED_OUT') || raw.includes('ERR_TIMED_OUT')) {
+    return `${host} did not respond in time.\n\nThe site may be down, or slow enough that the throttled profile cannot reach it. Try --no-throttle.`;
+  }
+  if (raw.includes('ERR_CERT_') || raw.includes('SSL')) {
+    return `${host} has an invalid TLS certificate, so the page could not be loaded safely.`;
+  }
+  if (raw.includes('ERR_TOO_MANY_REDIRECTS')) {
+    return `${host} redirected in a loop.`;
+  }
+  if (raw.includes('Timeout') && raw.includes('exceeded')) {
+    return `Loading ${host} took longer than the navigation timeout.\n\nRaise it with --timeout 90000, or drop the throttling with --no-throttle.`;
+  }
+  return `Could not load ${host}: ${raw.split('\n')[0]}`;
+}
+
 export async function audit(options: RunOptions): Promise<AuditResult> {
   const device = options.device ?? 'mobile';
   const wait = options.wait ?? 5000;
@@ -101,7 +140,11 @@ export async function audit(options: RunOptions): Promise<AuditResult> {
     }
 
     report(`Loading ${options.url}`);
-    await page.goto(options.url, { waitUntil: 'domcontentloaded', timeout });
+    try {
+      await page.goto(options.url, { waitUntil: 'domcontentloaded', timeout });
+    } catch (error) {
+      throw new NavigationError(describeNavigationFailure(error, options.url));
+    }
 
     try {
       await page.waitForLoadState('networkidle', { timeout: Math.min(timeout, 15000) });
