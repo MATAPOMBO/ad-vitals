@@ -17,6 +17,15 @@
     "ads"
   ],
   "license": "MIT",
+  "author": "Mateus de Carvalho (MATAPOMBO)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MATAPOMBO/ad-vitals.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MATAPOMBO/ad-vitals/issues"
+  },
+  "homepage": "https://github.com/MATAPOMBO/ad-vitals#readme",
   "type": "module",
   "bin": {
     "ad-vitals": "dist/cli.js"
