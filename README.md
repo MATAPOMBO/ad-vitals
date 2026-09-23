@@ -43,7 +43,7 @@ That is a fix you can paste.
 
 ## Install
 
-Requires Node 18+.
+Requires Node 20+ (Playwright's minimum).
 
 ```bash
 npx ad-vitals yoursite.com
